@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>예약 시스템</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #333; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .time-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 5px; }
+        .time-btn { padding: 8px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; text-align: center; }
+        .time-btn.selected { background: #007bff; color: white; border-color: #007bff; }
+        .time-btn.booked { background: #e9ecef; color: #adb5bd; cursor: not-allowed; text-decoration: line-through; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>방문 예약 시스템</h2>
+    <form id="reservationForm">
+        <div class="form-group">
+            <label for="name">신청자 성함</label>
+            <input type="text" id="name" required placeholder="홍길동">
+        </div>
+        <div class="form-group">
+            <label for="phone">연락처</label>
+            <input type="tel" id="phone" required placeholder="010-1234-5678">
+        </div>
+        <div class="form-group">
+            <label for="date">예약 날짜</label>
+            <input type="date" id="date" required>
+        </div>
+        <div class="form-group">
+            <label>예약 시간 선택</label>
+            <div id="timeSlotsContainer" class="time-slots">
+                <!-- 자바스크립트로 시간이 동적으로 생성됩니다 -->
+                <p style="font-size: 13px; color: #777; grid-column: span 3;">날짜를 먼저 선택해주세요.</p>
+            </div>
+        </div>
+        <button type="submit">예약 완료하기</button>
+    </form>
+    
+    <!-- 👇 이 부분을 추가해 주세요 -->
+    <div style="text-align: center; margin-top: 15px;">
+        <a href="/lookup.html" style="color: #007bff; text-decoration: none; font-size: 14px;">내 예약 조회 및 취소하기 →</a>
+    </div>
+</div>
+</div>
+
+<script>
+    const dateInput = document.getElementById('date');
+    const timeSlotsContainer = document.getElementById('timeSlotsContainer');
+    let selectedTime = null;
+
+    // 오늘 이후 날짜만 선택 가능하도록 설정
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.min = today;
+
+    const allTimes = ["10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
+
+    // 날짜 변경 시 이미 예약된 시간 불러오기
+    dateInput.addEventListener('change', async () => {
+        const selectedDate = dateInput.value;
+        selectedTime = null;
+
+        try {
+            const res = await fetch('/api/reservations');
+            const reservations = await res.json();
+            
+            // 선택한 날짜에 이미 예약된 시간대 추출
+            const bookedTimes = reservations
+                .filter(r => r.date === selectedDate)
+                .map(r => r.time);
+
+            renderTimeSlots(bookedTimes);
+        } catch (e) {
+            alert('데이터를 불러오는 중 오류가 발생했습니다.');
+        }
+    });
+
+    function renderTimeSlots(bookedTimes) {
+        timeSlotsContainer.innerHTML = '';
+        allTimes.forEach(time => {
+            const btn = document.createElement('div');
+            btn.className = 'time-btn';
+            btn.textContent = time;
+
+            if (bookedTimes.includes(time)) {
+                btn.classList.add('booked');
+            } else {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedTime = time;
+                });
+            }
+            timeSlotsContainer.appendChild(btn);
+        });
+    }
+
+    // 예약 제출
+    document.getElementById('reservationForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('name').value;
+        const phone = document.getElementById('phone').value;
+        const date = dateInput.value;
+
+        if (!selectedTime) {
+            alert('예약할 시간을 선택해주세요.');
+            return;
+        }
+
+        const response = await fetch('/api/reservations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, phone, date, time: selectedTime })
+        });
+
+        const result = await response.json();
+        alert(result.message);
+
+        if (result.success) {
+            location.reload(); // 성공 시 페이지 새로고침
+        }
+    });
+</script>
+
+</body>
+</html>

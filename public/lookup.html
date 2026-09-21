@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>예약 조회 및 취소</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #333; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result-box { margin-top: 20px; }
+        .reservation-item { background: #f1f3f5; padding: 15px; border-radius: 6px; margin-bottom: 10px; position: relative; }
+        .cancel-btn { background: #dc3545; padding: 6px 12px; font-size: 13px; width: auto; margin-top: 10px; }
+        .cancel-btn:hover { background: #c82333; }
+        .no-data { text-align: center; color: #777; margin-top: 20px; }
+        .nav-link { display: block; text-align: center; margin-top: 15px; color: #007bff; text-decoration: none; font-size: 14px; }
+        .nav-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🔍 내 예약 조회 / 취소</h2>
+    <form id="lookupForm">
+        <div class="form-group">
+            <label for="phone">등록한 연락처 입력</label>
+            <input type="tel" id="phone" required placeholder="010-1234-5678">
+        </div>
+        <button type="submit">예약 조회하기</button>
+    </form>
+
+    <div id="resultContainer" class="result-box"></div>
+    
+    <a href="/" class="nav-link">← 예약하러 가기</a>
+</div>
+
+<script>
+    document.getElementById('lookupForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const phone = document.getElementById('phone').value;
+        const resultContainer = document.getElementById('resultContainer');
+        resultContainer.innerHTML = '조회 중...';
+
+        try {
+            const res = await fetch(`/api/reservations/search?phone=${phone}`);
+            const reservations = await res.json();
+
+            resultContainer.innerHTML = '';
+
+            if (reservations.length === 0) {
+                resultContainer.innerHTML = '<p class="no-data">해당 연락처로 접수된 예약이 없습니다.</p>';
+                return;
+            }
+
+            reservations.forEach(r => {
+                const item = document.createElement('div');
+                item.className = 'reservation-item';
+                item.innerHTML = `
+                    <p><strong>신청자:</strong> ${r.name}</p>
+                    <p><strong>예약 날짜:</strong> ${r.date}</p>
+                    <p><strong>예약 시간:</strong> ${r.time}</p>
+                    <button class="cancel-btn" onclick="cancelReservation(${r.id})">예약 취소하기</button>
+                `;
+                resultContainer.appendChild(item);
+            });
+        } catch (e) {
+            resultContainer.innerHTML = '<p class="no-data">조회 중 오류가 발생했습니다.</p>';
+        }
+    });
+
+    async function cancelReservation(id) {
+        if (!confirm('정말 예약을 취소하시겠습니까?')) return;
+
+        try {
+            const res = await fetch(`/api/reservations/${id}`, { method: 'DELETE' });
+            const result = await res.json();
+            alert(result.message);
+            if (result.success) {
+                location.reload(); // 새로고침하여 목록 갱신
+            }
+        } catch (e) {
+            alert('취소 처리 중 오류가 발생했습니다.');
+        }
+    }
+</script>
+
+</body>
+</html>
