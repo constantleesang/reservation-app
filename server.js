@@ -8,14 +8,40 @@ const DB_FILE = path.join(__dirname, 'reservations.json');
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 초기 DB 파일 생성
+// 💡 [안전장치 함수] Render 환경에서 파일이 비거나 깨지는 현상을 방지하는 함수
+function readDB() {
+    try {
+        if (!fs.existsSync(DB_FILE)) {
+            fs.writeFileSync(DB_FILE, JSON.stringify([]));
+            return [];
+        }
+        const fileContent = fs.readFileSync(DB_FILE, 'utf8');
+        if (!fileContent.trim()) {
+            return [];
+        }
+        return JSON.parse(fileContent);
+    } catch (error) {
+        console.error("DB 읽기 에러:", error);
+        return [];
+    }
+}
+
+function writeDB(data) {
+    try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+    } catch (error) {
+        console.error("DB 쓰기 에러:", error);
+    }
+}
+
+// 초기 DB 파일 생성 확인
 if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify([]));
+    writeDB([]);
 }
 
 // 전체 예약 목록 조회 API (관리자용)
 app.get('/api/reservations', (req, res) => {
-    const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    const data = readDB();
     res.json(data);
 });
 
@@ -25,8 +51,7 @@ app.get('/api/reservations/search', (req, res) => {
     if (!phone) {
         return res.status(400).json({ success: false, message: '연락처를 입력해주세요.' });
     }
-    const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    // 취소되지 않은 예약만 조회되도록 필터링
+    const data = readDB();
     const userReservations = data.filter(item => item.phone === phone && item.status !== 'cancelled');
     res.json(userReservations);
 });
@@ -40,7 +65,7 @@ app.post('/api/reservations', (req, res) => {
         return res.status(400).json({ success: false, message: '모든 필수 정보를 입력해주세요.' });
     }
 
-    const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    const data = readDB();
 
     // 1. 동일한 사람(연락처 또는 학번)의 중복 예약 차단 (취소된 건 제외)
     const isAlreadyBookedByPerson = data.some(
@@ -74,15 +99,15 @@ app.post('/api/reservations', (req, res) => {
     };
 
     data.push(newReservation);
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+    writeDB(data);
 
     res.json({ success: true, message: '예약이 완료되었습니다!' });
 });
 
-// 예약 취소 API (데이터를 지우지 않고 상태를 'cancelled'로 변경하여 취소 현황 유지)
+// 예약 취소 API (데이터를 지우지 않고 상태를 'cancelled'로 변경)
 app.delete('/api/reservations/:id', (req, res) => {
     const id = Number(req.params.id);
-    let data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    let data = readDB();
     
     const target = data.find(item => item.id === id);
 
@@ -91,7 +116,7 @@ app.delete('/api/reservations/:id', (req, res) => {
     }
 
     target.status = 'cancelled';
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+    writeDB(data);
     
     res.json({ success: true, message: '예약이 성공적으로 취소되었습니다.' });
 });
