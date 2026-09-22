@@ -2,18 +2,22 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>예약 시스템</title>
+    <title>2026 CBNU 전투화 인솔 제공 이벤트</title>
     <style>
         body { font-family: 'Malgun Gothic', sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
         .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h2 { margin-top: 0; color: #333; }
+        .promo-title { font-size: 17px; font-weight: bold; color: #1a56db; text-align: center; margin-bottom: 20px; line-height: 1.4; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        textarea { resize: vertical; height: 80px; }
+        .guide-text { font-size: 12px; color: #e02424; margin-top: 4px; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 15px; }
+        .checkbox-group input { width: auto; }
+        button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 10px; }
         button:hover { background: #0056b3; }
         .time-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 5px; }
-        .time-btn { padding: 8px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; text-align: center; }
+        .time-btn { padding: 8px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; text-align: center; font-size: 14px; }
         .time-btn.selected { background: #007bff; color: white; border-color: #007bff; }
         .time-btn.booked { background: #e9ecef; color: #adb5bd; cursor: not-allowed; text-decoration: line-through; }
     </style>
@@ -21,35 +25,73 @@
 <body>
 
 <div class="card">
-    <h2>방문 예약 시스템</h2>
+    <!-- 5. 프로모션 타이틀 -->
+    <div class="promo-title">
+        2026 CBNU 입대예정 학생 대상<br>전투화 전용 맞춤형 인솔 제공 이벤트
+    </div>
+
     <form id="reservationForm">
         <div class="form-group">
             <label for="name">신청자 성함</label>
             <input type="text" id="name" required placeholder="홍길동">
         </div>
+
         <div class="form-group">
             <label for="phone">연락처</label>
             <input type="tel" id="phone" required placeholder="010-1234-5678">
         </div>
+
+        <!-- 1. 소속(학과), 학번 추가 -->
         <div class="form-group">
-            <label for="date">예약 날짜</label>
+            <label for="department">소속 (학과)</label>
+            <input type="text" id="department" required placeholder="예: 기계공학부">
+        </div>
+
+        <div class="form-group">
+            <label for="studentId">학번</label>
+            <input type="text" id="studentId" required placeholder="예: 202312345">
+        </div>
+
+        <!-- 2. 입영예정일 + 주의문구 추가 -->
+        <div class="form-group">
+            <label for="enlistmentDate">입영예정일</label>
+            <input type="date" id="enlistmentDate" required>
+            <div class="guide-text">주의: 최소 1달 여유 필요</div>
+        </div>
+
+        <div class="form-group">
+            <label for="date">방문 예약 날짜</label>
             <input type="date" id="date" required>
         </div>
+
+        <!-- 4. 예약 시간 30분 단위 선택 -->
         <div class="form-group">
-            <label>예약 시간 선택</label>
+            <label>예약 시간 선택 (30분 단위)</label>
             <div id="timeSlotsContainer" class="time-slots">
-                <!-- 자바스크립트로 시간이 동적으로 생성됩니다 -->
-                <p style="font-size: 13px; color: #777; grid-column: span 3;">날짜를 먼저 선택해주세요.</p>
+                <p style="font-size: 13px; color: #777; grid-column: span 3;">방문 예약 날짜를 먼저 선택해주세요.</p>
             </div>
         </div>
+
+        <!-- 3. 신청사연 (선택 입력) -->
+        <div class="form-group">
+            <label for="reason">신청 사연 (선택입력)</label>
+            <textarea id="reason" placeholder="평소 발 건강 고민이나 사연을 적어주세요 (선택사항)"></textarea>
+        </div>
+
+        <!-- 1. 개인정보 동의 체크 추가 -->
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="privacyAgree" required>
+            <label for="privacyAgree" style="margin-bottom:0; font-weight:normal; font-size:13px; cursor:pointer;">
+                [필수] 개인정보 수집 및 이용에 동의합니다.
+            </label>
+        </div>
+
         <button type="submit">예약 완료하기</button>
     </form>
     
-    <!-- 👇 이 부분을 추가해 주세요 -->
     <div style="text-align: center; margin-top: 15px;">
         <a href="/lookup.html" style="color: #007bff; text-decoration: none; font-size: 14px;">내 예약 조회 및 취소하기 →</a>
     </div>
-</div>
 </div>
 
 <script>
@@ -57,11 +99,15 @@
     const timeSlotsContainer = document.getElementById('timeSlotsContainer');
     let selectedTime = null;
 
-    // 오늘 이후 날짜만 선택 가능하도록 설정
+    // 오늘 이후 방문 날짜만 선택 가능하도록 설정
     const today = new Date().toISOString().split('T')[0];
     dateInput.min = today;
 
-    const allTimes = ["10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
+    // 4. 30분 단위 시간표 설정 (09:00 ~ 17:00)
+    const allTimes = [
+        "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+        "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"
+    ];
 
     // 날짜 변경 시 이미 예약된 시간 불러오기
     dateInput.addEventListener('change', async () => {
@@ -72,9 +118,9 @@
             const res = await fetch('/api/reservations');
             const reservations = await res.json();
             
-            // 선택한 날짜에 이미 예약된 시간대 추출
+            // 선택한 날짜에 취소되지 않은 예약 중 이미 예약된 시간대 추출
             const bookedTimes = reservations
-                .filter(r => r.date === selectedDate)
+                .filter(r => r.date === selectedDate && r.status !== 'cancelled')
                 .map(r => r.time);
 
             renderTimeSlots(bookedTimes);
@@ -106,9 +152,14 @@
     // 예약 제출
     document.getElementById('reservationForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
         const name = document.getElementById('name').value;
         const phone = document.getElementById('phone').value;
+        const department = document.getElementById('department').value;
+        const studentId = document.getElementById('studentId').value;
+        const enlistmentDate = document.getElementById('enlistmentDate').value;
         const date = dateInput.value;
+        const reason = document.getElementById('reason').value;
 
         if (!selectedTime) {
             alert('예약할 시간을 선택해주세요.');
@@ -118,7 +169,16 @@
         const response = await fetch('/api/reservations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, phone, date, time: selectedTime })
+            body: JSON.stringify({ 
+                name, 
+                phone, 
+                department, 
+                studentId, 
+                enlistmentDate, 
+                date, 
+                time: selectedTime, 
+                reason 
+            })
         });
 
         const result = await response.json();
