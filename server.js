@@ -26,47 +26,73 @@ app.get('/api/reservations/search', (req, res) => {
         return res.status(400).json({ success: false, message: '연락처를 입력해주세요.' });
     }
     const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    const userReservations = data.filter(item => item.phone === phone);
+    // 취소되지 않은 예약만 조회되도록 필터링
+    const userReservations = data.filter(item => item.phone === phone && item.status !== 'cancelled');
     res.json(userReservations);
 });
 
 // 예약 신청 API
 app.post('/api/reservations', (req, res) => {
-    const { name, phone, date, time } = req.body;
+    const { name, phone, department, studentId, enlistmentDate, date, time, reason } = req.body;
 
-    if (!name || !phone || !date || !time) {
-        return res.status(400).json({ success: false, message: '모든 정보를 입력해주세요.' });
+    // 필수 입력값 검증
+    if (!name || !phone || !department || !studentId || !enlistmentDate || !date || !time) {
+        return res.status(400).json({ success: false, message: '모든 필수 정보를 입력해주세요.' });
     }
 
     const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
 
-    // 중복 예약 확인
-    const isAlreadyBooked = data.some(item => item.date === date && item.time === time);
-    if (isAlreadyBooked) {
+    // 1. 동일한 사람(연락처 또는 학번)의 중복 예약 차단 (취소된 건 제외)
+    const isAlreadyBookedByPerson = data.some(
+        item => (item.phone === phone || item.studentId === studentId) && item.status !== 'cancelled'
+    );
+    if (isAlreadyBookedByPerson) {
+        return res.status(400).json({ success: false, message: '이미 해당 연락처나 학번으로 신청된 예약 내역이 존재합니다. (1인 1회)' });
+    }
+
+    // 2. 동일한 시간대 중복 예약 차단 (취소된 건 제외)
+    const isAlreadyBookedTime = data.some(
+        item => item.date === date && item.time === time && item.status !== 'cancelled'
+    );
+    if (isAlreadyBookedTime) {
         return res.status(400).json({ success: false, message: '이미 예약된 시간입니다. 다른 시간을 선택해주세요.' });
     }
 
     // 새 예약 추가
-    const newReservation = { id: Date.now(), name, phone, date, time };
+    const newReservation = { 
+        id: Date.now(), 
+        name, 
+        phone, 
+        department, 
+        studentId, 
+        enlistmentDate, 
+        date, 
+        time, 
+        reason: reason || '',
+        status: 'confirmed', // 'confirmed'(예약완료), 'cancelled'(취소됨)
+        createdAt: new Date().toISOString()
+    };
+
     data.push(newReservation);
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 
     res.json({ success: true, message: '예약이 완료되었습니다!' });
 });
 
-// 예약 취소 API
+// 예약 취소 API (데이터를 지우지 않고 상태를 'cancelled'로 변경하여 취소 현황 유지)
 app.delete('/api/reservations/:id', (req, res) => {
     const id = Number(req.params.id);
     let data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    const initialLength = data.length;
     
-    data = data.filter(item => item.id !== id);
+    const target = data.find(item => item.id === id);
 
-    if (data.length === initialLength) {
+    if (!target) {
         return res.status(404).json({ success: false, message: '해당 예약을 찾을 수 없습니다.' });
     }
 
+    target.status = 'cancelled';
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+    
     res.json({ success: true, message: '예약이 성공적으로 취소되었습니다.' });
 });
 
