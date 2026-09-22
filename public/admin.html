@@ -2,31 +2,47 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>예약 관리자 페이지</title>
+    <title>예약 관리자 페이지 - CBNU 인솔 이벤트</title>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f4f6f8; }
+        body { font-family: 'Malgun Gothic', sans-serif; max-width: 1100px; margin: 40px auto; padding: 20px; background: #f4f6f8; }
         .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h2 { margin-top: 0; color: #333; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h2 { margin: 0; color: #333; }
+        .excel-btn { background: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .excel-btn:hover { background: #218838; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         th { background-color: #007bff; color: white; }
         tr:nth-child(even) { background-color: #f9f9f9; }
+        .status-confirmed { color: #28a745; font-weight: bold; }
+        .status-cancelled { color: #dc3545; font-weight: bold; text-decoration: line-through; }
         .empty { text-align: center; color: #777; padding: 20px; }
+        .reason-box { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>📋 전체 예약 현황 관리</h2>
-    <p>현재 접수된 모든 예약 내역입니다.</p>
+    <div class="header-flex">
+        <div>
+            <h2>📋 전체 예약 현황 관리</h2>
+            <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">신규 예약이 접수되면 자동으로 알림이 울립니다.</p>
+        </div>
+        <button class="excel-btn" onclick="downloadExcel()">📊 엑셀 다운로드 (CSV)</button>
+    </div>
+
     <table>
         <thead>
             <tr>
-                <th>예약 번호</th>
-                <th>신청자 성함</th>
+                <th>상태</th>
+                <th>예약번호</th>
+                <th>성함</th>
+                <th>소속(학과)</th>
+                <th>학번</th>
                 <th>연락처</th>
-                <th>예약 날짜</th>
-                <th>예약 시간</th>
+                <th>입영예정일</th>
+                <th>예약일시</th>
+                <th>신청사연</th>
             </tr>
         </thead>
         <tbody id="adminTableBody">
@@ -36,15 +52,27 @@
 </div>
 
 <script>
+    let previousCount = -1;
+    let allReservations = [];
+
     async function loadReservations() {
         try {
             const res = await fetch('/api/reservations');
             const reservations = await res.json();
             const tbody = document.getElementById('adminTableBody');
+            
+            // 신규 예약 감지 알림 기능 (처음 로딩 제외)
+            if (previousCount !== -1 && reservations.length > previousCount) {
+                const latest = reservations[reservations.length - 1];
+                alert(`🚨 [신규 예약 알림] ${latest.name}님의 새로운 인솔 신청이 접수되었습니다!`);
+            }
+            previousCount = reservations.length;
+            allReservations = reservations; // 엑셀 다운로드용 저장
+
             tbody.innerHTML = '';
 
             if (reservations.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="empty">접수된 예약이 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="empty">접수된 예약이 없습니다.</td></tr>`;
                 return;
             }
 
@@ -53,21 +81,53 @@
 
             reservations.forEach(r => {
                 const tr = document.createElement('tr');
+                const isCancelled = r.status === 'cancelled';
+                
                 tr.innerHTML = `
+                    <td><span class="${isCancelled ? 'status-cancelled' : 'status-confirmed'}">${isCancelled ? '취소됨' : '예약완료'}</span></td>
                     <td>${r.id}</td>
                     <td>${r.name}</td>
+                    <td>${r.department || '-'}</td>
+                    <td>${r.studentId || '-'}</td>
                     <td>${r.phone}</td>
-                    <td>${r.date}</td>
-                    <td>${r.time}</td>
+                    <td>${r.enlistmentDate || '-'}</td>
+                    <td>${r.date} ${r.time}</td>
+                    <td><div class="reason-box" title="${r.reason || ''}">${r.reason || '-'}</div></td>
                 `;
                 tbody.appendChild(tr);
             });
         } catch (e) {
-            alert('데이터를 불러오지 못했습니다.');
+            console.error('데이터를 불러오지 못했습니다.', e);
         }
     }
 
+    // 엑셀(CSV) 다운로드 함수
+    function downloadExcel() {
+        if (allReservations.length === 0) {
+            alert('다운로드할 데이터가 없습니다.');
+            return;
+        }
+
+        // 엑셀에서 한글이 깨지지 않도록 BOM(\uFEFF) 추가
+        let csv = '\uFEFF상태,예약번호,성함,소속,학번,연락처,입영예정일,방문예약일,방문예약시간,신청사연\n';
+        
+        allReservations.forEach(r => {
+            const statusText = r.status === 'cancelled' ? '취소됨' : '예약완료';
+            const safeReason = (r.reason || '').replace(/"/g, '""'); // 쉼표나 따옴표 깨짐 방지
+            csv += `${statusText},${r.id},${r.name},${r.department},${r.studentId},${r.phone},${r.enlistmentDate},${r.date},${r.time},"${safeReason}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `CBNU_전투화인솔_예약현황_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+    }
+
+    // 최초 로딩 및 5초마다 자동 새로고침(실시간 알림 및 현황 동기화)
     loadReservations();
+    setInterval(loadReservations, 5000);
 </script>
 
 </body>
