@@ -12,6 +12,7 @@
         input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
         textarea { resize: vertical; height: 80px; }
         .guide-text { font-size: 12px; color: #e02424; margin-top: 4px; }
+        .location-box { background: #f1f5f9; padding: 10px 12px; border-radius: 4px; font-size: 13px; color: #333; margin-bottom: 15px; line-height: 1.4; }
         .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 15px; }
         .checkbox-group input { width: auto; }
         button { background: #007bff; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 10px; }
@@ -25,7 +26,7 @@
 <body>
 
 <div class="card">
-    <!-- 5. 프로모션 타이틀 -->
+    <!-- 프로모션 타이틀 -->
     <div class="promo-title">
         2026 CBNU 입대예정 학생 대상<br>전투화 전용 맞춤형 인솔 제공 이벤트
     </div>
@@ -41,7 +42,6 @@
             <input type="tel" id="phone" required placeholder="010-1234-5678">
         </div>
 
-        <!-- 1. 소속(학과), 학번 추가 -->
         <div class="form-group">
             <label for="department">소속 (학과)</label>
             <input type="text" id="department" required placeholder="예: 기계공학부">
@@ -52,7 +52,6 @@
             <input type="text" id="studentId" required placeholder="예: 202312345">
         </div>
 
-        <!-- 2. 입영예정일 + 주의문구 추가 -->
         <div class="form-group">
             <label for="enlistmentDate">입영예정일</label>
             <input type="date" id="enlistmentDate" required>
@@ -64,7 +63,6 @@
             <input type="date" id="date" required>
         </div>
 
-        <!-- 4. 예약 시간 30분 단위 선택 -->
         <div class="form-group">
             <label>예약 시간 선택 (30분 단위)</label>
             <div id="timeSlotsContainer" class="time-slots">
@@ -72,13 +70,16 @@
             </div>
         </div>
 
-        <!-- 3. 신청사연 (선택 입력) -->
+        <!-- 💡 예약 시간 선택 메뉴 바로 아래 추가된 방문 장소 안내 -->
+        <div class="location-box">
+            📍 <strong>방문 장소:</strong> 충북대학교 학연산공동기술연구원 441호, (주)엑슬릭스
+        </div>
+
         <div class="form-group">
             <label for="reason">신청 사연 (선택입력)</label>
             <textarea id="reason" placeholder="평소 발 건강 고민이나 사연을 적어주세요 (선택사항)"></textarea>
         </div>
 
-        <!-- 1. 개인정보 동의 체크 추가 -->
         <div class="form-group checkbox-group">
             <input type="checkbox" id="privacyAgree" required>
             <label for="privacyAgree" style="margin-bottom:0; font-weight:normal; font-size:13px; cursor:pointer;">
@@ -99,17 +100,14 @@
     const timeSlotsContainer = document.getElementById('timeSlotsContainer');
     let selectedTime = null;
 
-    // 오늘 이후 방문 날짜만 선택 가능하도록 설정
     const today = new Date().toISOString().split('T')[0];
     dateInput.min = today;
 
-    // 4. 30분 단위 시간표 설정 (09:00 ~ 17:00)
     const allTimes = [
         "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
         "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"
     ];
 
-    // 날짜 변경 시 이미 예약된 시간 불러오기
     dateInput.addEventListener('change', async () => {
         const selectedDate = dateInput.value;
         selectedTime = null;
@@ -118,7 +116,6 @@
             const res = await fetch('/api/reservations');
             const reservations = await res.json();
             
-            // 선택한 날짜에 취소되지 않은 예약 중 이미 예약된 시간대 추출
             const bookedTimes = reservations
                 .filter(r => r.date === selectedDate && r.status !== 'cancelled')
                 .map(r => r.time);
@@ -149,7 +146,6 @@
         });
     }
 
-    // 예약 제출
     document.getElementById('reservationForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -185,7 +181,7 @@
         alert(result.message);
 
         if (result.success) {
-            location.reload(); // 성공 시 페이지 새로고침
+            location.reload();
         }
     });
 </script>
