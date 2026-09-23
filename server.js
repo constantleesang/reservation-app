@@ -7,7 +7,7 @@ const PORT = 3000;
 
 // 🔑 [수정 필요] 본인의 Supabase 프로젝트 정보 입력
 const SUPABASE_URL = 'https://szbzpdbmqxyumyxgihnt.supabase.co'; // 예: 'https://xxxx.supabase.co'
-const SUPABASE_KEY = 'sb_secret_wIDOgmJH9h8CPlKeU4SR2w_AERPdZJQ'; // service_role 키 입력
+const SUPABASE_KEY = 'sb_publishable_OHGqy7JGLFtR3NOKBX_8FQ_iPJ03Oyl'; // service_role 키 입력
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
