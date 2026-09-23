@@ -1,124 +1,121 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
+
 const app = express();
 const PORT = 3000;
-const DB_FILE = path.join(__dirname, 'reservations.json');
+
+// 🔑 [수정 필요] 본인의 Supabase 프로젝트 정보 입력
+const SUPABASE_URL = 'https://szbzpdbmqxyumyxgihnt.supabase.co'; // 예: 'https://xxxx.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6YnpwZGJtcXh5dW15eGdpaG50Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDEwNTAxOSwiZXhwIjoyMTA1NjgxMDE5fQ._QcqW_-YqQPMQOSQG4fu-tghZFY4hL1J8xRN16NJvkA'; // service_role 키 입력
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 💡 [안전장치 함수] Render 환경에서 파일이 비거나 깨지는 현상을 방지하는 함수
-function readDB() {
-    try {
-        if (!fs.existsSync(DB_FILE)) {
-            fs.writeFileSync(DB_FILE, JSON.stringify([]));
-            return [];
-        }
-        const fileContent = fs.readFileSync(DB_FILE, 'utf8');
-        if (!fileContent.trim()) {
-            return [];
-        }
-        return JSON.parse(fileContent);
-    } catch (error) {
-        console.error("DB 읽기 에러:", error);
-        return [];
-    }
-}
-
-function writeDB(data) {
-    try {
-        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-    } catch (error) {
-        console.error("DB 쓰기 에러:", error);
-    }
-}
-
-// 초기 DB 파일 생성 확인
-if (!fs.existsSync(DB_FILE)) {
-    writeDB([]);
-}
-
 // 전체 예약 목록 조회 API (관리자용)
-app.get('/api/reservations', (req, res) => {
-    const data = readDB();
-    res.json(data);
+app.get('/api/reservations', async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('reservations').select('*');
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        console.error("조회 에러:", err.message);
+        res.status(500).json({ success: false, message: '데이터를 불러오는 중 오류가 발생했습니다.' });
+    }
 });
 
 // 전화번호로 내 예약 검색 API (방문자용)
-app.get('/api/reservations/search', (req, res) => {
+app.get('/api/reservations/search', async (req, res) => {
     const { phone } = req.query;
     if (!phone) {
         return res.status(400).json({ success: false, message: '연락처를 입력해주세요.' });
     }
-    const data = readDB();
-    const userReservations = data.filter(item => item.phone === phone && item.status !== 'cancelled');
-    res.json(userReservations);
+    try {
+        const { data, error } = await supabase
+            .from('reservations')
+            .select('*')
+            .eq('phone', phone)
+            .neq('status', 'cancelled');
+
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        console.error("검색 에러:", err.message);
+        res.status(500).json({ success: false, message: '검색 중 오류가 발생했습니다.' });
+    }
 });
 
 // 예약 신청 API
-app.post('/api/reservations', (req, res) => {
+app.post('/api/reservations', async (req, res) => {
     const { name, phone, department, studentId, enlistmentDate, date, time, reason } = req.body;
 
-    // 필수 입력값 검증
     if (!name || !phone || !department || !studentId || !enlistmentDate || !date || !time) {
         return res.status(400).json({ success: false, message: '모든 필수 정보를 입력해주세요.' });
     }
 
-    const data = readDB();
+    try {
+        // 1. 기존 데이터 전체 조회 후 중복 체크
+        const { data: existingData, error: fetchError } = await supabase.from('reservations').select('*');
+        if (fetchError) throw fetchError;
 
-    // 1. 동일한 사람(연락처 또는 학번)의 중복 예약 차단 (취소된 건 제외)
-    const isAlreadyBookedByPerson = data.some(
-        item => (item.phone === phone || item.studentId === studentId) && item.status !== 'cancelled'
-    );
-    if (isAlreadyBookedByPerson) {
-        return res.status(400).json({ success: false, message: '이미 해당 연락처나 학번으로 신청된 예약 내역이 존재합니다. (1인 1회)' });
+        // 동일 연락처 또는 학번 중복 체크 (취소 건 제외)
+        const isAlreadyBookedByPerson = existingData.some(
+            item => (item.phone === phone || item.studentId === studentId) && item.status !== 'cancelled'
+        );
+        if (isAlreadyBookedByPerson) {
+            return res.status(400).json({ success: false, message: '이미 해당 연락처나 학번으로 신청된 예약 내역이 존재합니다. (1인 1회)' });
+        }
+
+        // 동일 시간대 중복 체크 (취소 건 제외)
+        const isAlreadyBookedTime = existingData.some(
+            item => item.date === date && item.time === time && item.status !== 'cancelled'
+        );
+        if (isAlreadyBookedTime) {
+            return res.status(400).json({ success: false, message: '이미 예약된 시간입니다. 다른 시간을 선택해주세요.' });
+        }
+
+        // 2. 새 예약 DB 삽입
+        const newReservation = { 
+            id: Date.now(), 
+            name, 
+            phone, 
+            department, 
+            studentId, 
+            enlistmentDate, 
+            date, 
+            time, 
+            reason: reason || '',
+            status: 'confirmed'
+        };
+
+        const { error: insertError } = await supabase.from('reservations').insert([newReservation]);
+        if (insertError) throw insertError;
+
+        res.json({ success: true, message: '예약이 완료되었습니다!' });
+    } catch (err) {
+        console.error("예약 등록 에러:", err.message);
+        res.status(500).json({ success: false, message: '서버 오류로 예약을 완료하지 못했습니다.' });
     }
-
-    // 2. 동일한 시간대 중복 예약 차단 (취소된 건 제외)
-    const isAlreadyBookedTime = data.some(
-        item => item.date === date && item.time === time && item.status !== 'cancelled'
-    );
-    if (isAlreadyBookedTime) {
-        return res.status(400).json({ success: false, message: '이미 예약된 시간입니다. 다른 시간을 선택해주세요.' });
-    }
-
-    // 새 예약 추가
-    const newReservation = { 
-        id: Date.now(), 
-        name, 
-        phone, 
-        department, 
-        studentId, 
-        enlistmentDate, 
-        date, 
-        time, 
-        reason: reason || '',
-        status: 'confirmed', // 'confirmed'(예약완료), 'cancelled'(취소됨)
-        createdAt: new Date().toISOString()
-    };
-
-    data.push(newReservation);
-    writeDB(data);
-
-    res.json({ success: true, message: '예약이 완료되었습니다!' });
 });
 
-// 예약 취소 API (데이터를 지우지 않고 상태를 'cancelled'로 변경)
-app.delete('/api/reservations/:id', (req, res) => {
+// 예약 취소 API (상태를 'cancelled'로 변경)
+app.delete('/api/reservations/:id', async (req, res) => {
     const id = Number(req.params.id);
-    let data = readDB();
-    
-    const target = data.find(item => item.id === id);
+    try {
+        const { error } = await supabase
+            .from('reservations')
+            .update({ status: 'cancelled' })
+            .eq('id', id);
 
-    if (!target) {
-        return res.status(404).json({ success: false, message: '해당 예약을 찾을 수 없습니다.' });
+        if (error) throw error;
+
+        res.json({ success: true, message: '예약이 성공적으로 취소되었습니다.' });
+    } catch (err) {
+        console.error("취소 에러:", err.message);
+        res.status(500).json({ success: false, message: '예약 취소 중 오류가 발생했습니다.' });
     }
-
-    target.status = 'cancelled';
-    writeDB(data);
-    
-    res.json({ success: true, message: '예약이 성공적으로 취소되었습니다.' });
 });
 
 app.listen(PORT, () => {
