@@ -5,8 +5,8 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = 3000;
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://본인프로젝트ID.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || '본인_시크릿키_입력';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://szbzpdbmqxyumyxgihnt.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_OHGqy7JGLFtR3NOKBX_8FQ_iPJ03Oyl';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
