@@ -5,9 +5,8 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = 3000;
 
-// 🔑 [수정 필요] 본인의 Supabase 프로젝트 정보 입력
-const SUPABASE_URL = 'https://szbzpdbmqxyumyxgihnt.supabase.co'; // 예: 'https://xxxx.supabase.co'
-const SUPABASE_KEY = 'sb_publishable_OHGqy7JGLFtR3NOKBX_8FQ_iPJ03Oyl'; // service_role 키 입력
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://본인프로젝트ID.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || '본인_시크릿키_입력';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -56,11 +55,9 @@ app.post('/api/reservations', async (req, res) => {
     }
 
     try {
-        // 1. 기존 데이터 전체 조회 후 중복 체크
         const { data: existingData, error: fetchError } = await supabase.from('reservations').select('*');
         if (fetchError) throw fetchError;
 
-        // 동일 연락처 또는 학번 중복 체크 (취소 건 제외)
         const isAlreadyBookedByPerson = existingData.some(
             item => (item.phone === phone || item.studentId === studentId) && item.status !== 'cancelled'
         );
@@ -68,7 +65,6 @@ app.post('/api/reservations', async (req, res) => {
             return res.status(400).json({ success: false, message: '이미 해당 연락처나 학번으로 신청된 예약 내역이 존재합니다. (1인 1회)' });
         }
 
-        // 동일 시간대 중복 체크 (취소 건 제외)
         const isAlreadyBookedTime = existingData.some(
             item => item.date === date && item.time === time && item.status !== 'cancelled'
         );
@@ -76,14 +72,13 @@ app.post('/api/reservations', async (req, res) => {
             return res.status(400).json({ success: false, message: '이미 예약된 시간입니다. 다른 시간을 선택해주세요.' });
         }
 
-        // 2. 새 예약 DB 삽입
         const newReservation = { 
             id: Date.now(), 
             name, 
             phone, 
             department, 
             studentId, 
-            enlistmentDate, 
+            enlistment_date: enlistmentDate, // DB 컬럼명을 enlistment_date로 매칭
             date, 
             time, 
             reason: reason || '',
@@ -100,7 +95,7 @@ app.post('/api/reservations', async (req, res) => {
     }
 });
 
-// 예약 취소 API (상태를 'cancelled'로 변경)
+// 예약 취소 API
 app.delete('/api/reservations/:id', async (req, res) => {
     const id = Number(req.params.id);
     try {
