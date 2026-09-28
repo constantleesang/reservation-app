@@ -5,8 +5,9 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = 3000;
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://szbzpdbmqxyumyxgihnt.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_OHGqy7JGLFtR3NOKBX_8FQ_iPJ03Oyl';
+// 환경 변수 또는 직접 입력 설정
+const SUPABASE_URL = process.env.SUPABASE_URL || 'YOUR_SUPABASE_URL'; 
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'YOUR_SUPABASE_KEY'; 
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -18,7 +19,15 @@ app.get('/api/reservations', async (req, res) => {
     try {
         const { data, error } = await supabase.from('reservations').select('*');
         if (error) throw error;
-        res.json(data);
+        
+        // 프론트엔드 호환을 위해 DB의 스네이크 케이스를 카멜 케이스로 변환
+        const formattedData = data.map(item => ({
+            ...item,
+            studentId: item.student_id,
+            enlistmentDate: item.enlistment_date
+        }));
+
+        res.json(formattedData);
     } catch (err) {
         console.error("조회 에러:", err.message);
         res.status(500).json({ success: false, message: '데이터를 불러오는 중 오류가 발생했습니다.' });
@@ -39,7 +48,14 @@ app.get('/api/reservations/search', async (req, res) => {
             .neq('status', 'cancelled');
 
         if (error) throw error;
-        res.json(data);
+
+        const formattedData = data.map(item => ({
+            ...item,
+            studentId: item.student_id,
+            enlistmentDate: item.enlistment_date
+        }));
+
+        res.json(formattedData);
     } catch (err) {
         console.error("검색 에러:", err.message);
         res.status(500).json({ success: false, message: '검색 중 오류가 발생했습니다.' });
@@ -58,8 +74,9 @@ app.post('/api/reservations', async (req, res) => {
         const { data: existingData, error: fetchError } = await supabase.from('reservations').select('*');
         if (fetchError) throw fetchError;
 
+        // 중복 체크 (student_id 기준)
         const isAlreadyBookedByPerson = existingData.some(
-            item => (item.phone === phone || item.studentId === studentId) && item.status !== 'cancelled'
+            item => (item.phone === phone || item.student_id === studentId) && item.status !== 'cancelled'
         );
         if (isAlreadyBookedByPerson) {
             return res.status(400).json({ success: false, message: '이미 해당 연락처나 학번으로 신청된 예약 내역이 존재합니다. (1인 1회)' });
@@ -72,13 +89,14 @@ app.post('/api/reservations', async (req, res) => {
             return res.status(400).json({ success: false, message: '이미 예약된 시간입니다. 다른 시간을 선택해주세요.' });
         }
 
+        // DB 컬럼명(student_id, enlistment_date)에 맞춰 데이터 저장
         const newReservation = { 
             id: Date.now(), 
             name, 
             phone, 
             department, 
-            studentId, 
-            enlistment_date: enlistmentDate, // DB 컬럼명을 enlistment_date로 매칭
+            student_id: studentId, 
+            enlistment_date: enlistmentDate, 
             date, 
             time, 
             reason: reason || '',
